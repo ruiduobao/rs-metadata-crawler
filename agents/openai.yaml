@@ -1,0 +1,4 @@
+description: Crawl satellite imagery metadata from Copernicus, USGS EarthExplorer,
+  and Microsoft Planetary Computer
+display_name: Rs Metadata Crawler
+name: rs-metadata-crawler

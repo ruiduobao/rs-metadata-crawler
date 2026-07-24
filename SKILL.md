@@ -1,26 +1,16 @@
 ---
-name: rs-metadata-crawler
-display_name: RS Metadata Crawler / 遥感元数据爬虫
-version: 0.1.0
-author: rui.duobao
-license: MIT-0
-description: |
-  Crawl satellite imagery metadata from Copernicus, USGS EarthExplorer, and Microsoft Planetary Computer.
-  Search by bbox, date range, cloud cover, and platform. Output CSV/JSON with statistics and deduplication.
+description: 'Crawl satellite imagery metadata from Copernicus, USGS EarthExplorer,
+  and Microsoft Planetary Computer.
+
+  Search by bbox, date range, cloud cover, and platform. Output CSV/JSON with statistics
+  and deduplication.
+
   从 Copernicus、USGS EarthExplorer 和 Microsoft Planetary Computer 爬取卫星影像元数据。
+
   支持按边界框、日期范围、云量和卫星平台搜索，输出 CSV/JSON 格式，含统计摘要和去重功能。
-runtime: python>=3.9
-tags:
-  - remote-sensing
-  - satellite
-  - metadata
-  - copernicus
-  - usgs
-  - landsat
-  - sentinel
-  - stac
-  - crawler
-  - geospatial
+
+  '
+name: rs-metadata-crawler
 ---
 
 # RS Metadata Crawler

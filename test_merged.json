@@ -1,0 +1,18 @@
+[
+  {
+    "scene_id": "S2B_MSIL2A_20240602T025529_R032_T50TNK_20240602T065013",
+    "source": "planetary_computer",
+    "platform": "sentinel-2",
+    "title": "S2B_MSIL2A_20240602T025529_R032_T50TNK_20240602T065013",
+    "date": "2024-06-02",
+    "cloud_cover": 25.915417,
+    "footprint": "{\"type\": \"Polygon\", \"coordinates\": [[[116.9997634, 40.6508565], [118.2983407, 40.6435572], [118.2796421, 39.6545573], [116.9997668, 39.661607], [116.9997634, 40.6508565]]]}",
+    "metadata": {
+      "collection": "sentinel-2-l2a",
+      "platform": "Sentinel-2B",
+      "instrument": "msi",
+      "processing_level": "",
+      "gsd": ""
+    }
+  }
+]
