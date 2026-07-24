@@ -65,3 +65,33 @@ python rs-metadata-crawler.py merge --inputs a.json b.json --output merged.json
 | `--format` | Output format | `json`, `csv` |
 | `--limit` | Max results per source | `100` |
 | `--cache-dir` | Cache directory | `.cache` |
+
+---
+
+## 中文说明
+
+从 Copernicus、USGS EarthExplorer 和 Microsoft Planetary Computer 爬取卫星影像元数据，不下载实际影像。
+
+### 支持的数据源
+
+| 数据源 | 卫星 | 需要认证 |
+|--------|------|----------|
+| Copernicus Open Access Hub | Sentinel-1/2/3/5P | 否（仅元数据） |
+| USGS EarthExplorer | Landsat-5/7/8/9 | 否（公开接口） |
+| Microsoft Planetary Computer | Sentinel-2, Landsat | 否 |
+
+### 使用方法
+
+```bash
+# 搜索 Sentinel-2 元数据
+python rs-metadata-crawler.py search --bbox 116 39 117 40 --start-date 2024-01-01 --end-date 2024-12-31 --platform sentinel-2 --max-cloud 20
+
+# 从 USGS 搜索 Landsat
+python rs-metadata-crawler.py search --bbox 116 39 117 40 --start-date 2024-01-01 --end-date 2024-12-31 --platform landsat-8 --source usgs
+
+# 查看统计信息
+python rs-metadata-crawler.py stats --input results.json
+
+# 合并去重
+python rs-metadata-crawler.py merge --inputs a.json b.json --output merged.json
+```
