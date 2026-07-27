@@ -28,10 +28,76 @@ except ImportError:
     print("Error: requests library required. Install with: pip install requests")
     sys.exit(1)
 
-__version__ = "0.1.0"
+# Local place-resolver (batch3 v0.2.0+)
+try:
+    from place_resolver import (
+        resolve_place,
+        get_preset,
+        list_presets,
+        format_bbox,
+        PlaceNotFoundError,
+        PRESETS,
+    )
+except ImportError as _exc:
+    print(
+        f"Warning: place_resolver.py not found ({_exc}). --place/--preset disabled.",
+        file=sys.stderr,
+    )
+    PRESETS = {}
+
+    def resolve_place(*args, **kwargs):
+        raise RuntimeError("place_resolver.py missing")
+
+    def get_preset(name):
+        raise ValueError(f"Unknown preset: {name}")
+
+    def list_presets():
+        return "(place_resolver.py missing)"
+
+    def format_bbox(b):
+        return f"{b[0]} {b[1]} {b[2]} {b[3]}"
+
+    class PlaceNotFoundError(ValueError):
+        pass
+
+__version__ = "0.2.0"
 __author__ = "rui.duobao"
 
 USER_AGENT = f"rs-metadata-crawler/{__version__} (https://github.com/rui.duobao/rs-metadata-crawler)"
+
+
+def write_qa_summary(qa_path: str, args, scenes, stats) -> None:
+    """Write a JSON run-summary sidecar to qa_path (Phase 5 optimization).
+
+    Records the bbox / place / preset, the date range, the source, and the
+    scene counts (total / sources / date range / mean cloud cover) so each
+    metadata crawl is auditable.
+    """
+    summary = {
+        "skill": "rs-metadata-crawler",
+        "command": "search",
+        "version": __version__,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "bbox": list(args.bbox) if getattr(args, "bbox", None) else None,
+        "place": getattr(args, "place", None),
+        "preset": getattr(args, "preset", None),
+        "start_date": getattr(args, "start_date", None),
+        "end_date": getattr(args, "end_date", None),
+        "platform": getattr(args, "platform", None),
+        "source": getattr(args, "source", None),
+        "max_cloud": getattr(args, "max_cloud", None),
+        "limit": getattr(args, "limit", None),
+        "cache_dir": getattr(args, "cache_dir", None),
+        "output": getattr(args, "output", None),
+        "format": getattr(args, "format", None),
+        "n_scenes": len(scenes) if scenes is not None else 0,
+        "stats": stats,
+    }
+    parent = os.path.dirname(os.path.abspath(qa_path))
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(qa_path, "w", encoding="utf-8") as f:
+        json.dump(summary, f, ensure_ascii=False, indent=2)
 
 PLATFORM_MAP = {
     "sentinel-1": "copernicus",
@@ -565,9 +631,67 @@ def export_results(scenes: List[Dict], output_path: str, fmt: str = "json"):
             writer.writerows(flat_scenes)
 
 
+def resolve_args(args):
+    """Resolve --bbox / --place / --preset; fill in platform / source / max-cloud.
+
+    Returns (bbox, source_label, err_code).
+    """
+    # Apply preset first
+    if getattr(args, "preset", None):
+        p = get_preset(args.preset)
+        for k, v in p.items():
+            if k == "description":
+                continue
+            current = getattr(args, k, None)
+            if k in ("platform", "source", "max_cloud") and current in (
+                # argparse defaults
+                "sentinel-2", None,
+            ):
+                setattr(args, k, v)
+            if k == "bbox" and current is None:
+                setattr(args, k, v)
+
+    # --bbox wins
+    if getattr(args, "bbox", None) and len(args.bbox) == 4:
+        return (
+            validate_bbox(args.bbox),
+            f"--bbox {format_bbox(args.bbox)}",
+            None,
+        )
+
+    # --place
+    if getattr(args, "place", None):
+        try:
+            bbox = resolve_place(args.place)
+            return bbox, f"--place '{args.place}' → {format_bbox(bbox)}", None
+        except PlaceNotFoundError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return None, "not_found", 1
+
+    # --preset (if no bbox/place, fall back to preset's bbox)
+    if getattr(args, "preset", None):
+        p = get_preset(args.preset)
+        bbox = p.get("bbox")
+        if bbox is None:
+            return None, f"--preset '{args.preset}' (no spatial filter)", None
+        return bbox, f"--preset '{args.preset}' → {format_bbox(bbox)}", None
+
+    return None, "(no spatial filter)", 1  # err: must have bbox/place/preset
+
+
 def cmd_search(args):
     """Execute search command."""
-    bbox = validate_bbox(args.bbox)
+    bbox, source_label, err = resolve_args(args)
+    if err:
+        if err == 1 and source_label == "(no spatial filter)":
+            print(
+                "Error: --bbox W S E N, --place 'name', or --preset <name> is required.",
+                file=sys.stderr,
+            )
+        return err
+    if not (args.start_date and args.end_date):
+        print("Error: --start-date and --end-date are required.", file=sys.stderr)
+        return 1
     start_date = validate_date(args.start_date)
     end_date = validate_date(args.end_date)
 
@@ -614,6 +738,14 @@ def cmd_search(args):
     if stats['cloud_cover']['mean'] is not None:
         print(f"  Cloud cover: {stats['cloud_cover']['min']:.1f}% - {stats['cloud_cover']['max']:.1f}% (mean: {stats['cloud_cover']['mean']:.1f}%)")
     print(f"  Output: {output_path}")
+
+    # Phase 5: --qa sidecar summary
+    if getattr(args, "qa", None):
+        try:
+            write_qa_summary(args.qa, args, scenes, stats)
+            print(f"QA: {args.qa}")
+        except OSError as e:
+            print(f"WARN: could not write QA sidecar {args.qa}: {e}", file=sys.stderr)
 
     return 0
 
@@ -688,6 +820,24 @@ def cmd_merge(args):
     return 0
 
 
+def cmd_list_presets(args):
+    print(list_presets())
+    return 0
+
+
+def cmd_list_regions(args):
+    try:
+        from place_resolver import HARDCODED_BBOXES
+    except ImportError:
+        print("place_resolver.py missing", file=sys.stderr)
+        return 1
+    print(f"Offline region catalog ({len(HARDCODED_BBOXES)} entries):\n")
+    for key in sorted(HARDCODED_BBOXES.keys()):
+        bbox = HARDCODED_BBOXES[key]
+        print(f"  {key:<24} {format_bbox(bbox)}")
+    return 0
+
+
 def main(argv=None):
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -699,8 +849,12 @@ def main(argv=None):
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
     search_parser = subparsers.add_parser("search", help="Search for satellite metadata")
-    search_parser.add_argument("--bbox", nargs=4, type=float, required=True,
+    search_parser.add_argument("--bbox", nargs=4, type=float,
                                help="Bounding box: west south east north")
+    search_parser.add_argument("--place",
+                               help="Place name (e.g. '北京市', '长江流域'). Offline + Nominatim.")
+    search_parser.add_argument("--preset", choices=list(PRESETS.keys()),
+                               help="Apply a named preset (e.g. s2-china-recent).")
     search_parser.add_argument("--start-date", required=True, help="Start date (YYYY-MM-DD)")
     search_parser.add_argument("--end-date", required=True, help="End date (YYYY-MM-DD)")
     search_parser.add_argument("--platform", default="sentinel-2",
@@ -714,6 +868,9 @@ def main(argv=None):
     search_parser.add_argument("--limit", type=int, default=100,
                                help="Maximum results per source (default: 100)")
     search_parser.add_argument("--cache-dir", help="Cache directory")
+    search_parser.add_argument("--qa", default=None, metavar="PATH",
+                               help="Write a JSON run-summary sidecar to PATH (e.g. --qa run.qa.json). "
+                                    "Records the bbox/place/preset, date range, source, and scene counts.")
     search_parser.set_defaults(func=cmd_search)
 
     stats_parser = subparsers.add_parser("stats", help="Show statistics for results")
@@ -724,6 +881,12 @@ def main(argv=None):
     merge_parser.add_argument("--inputs", nargs="+", required=True, help="Input files to merge")
     merge_parser.add_argument("--output", help="Output file path")
     merge_parser.set_defaults(func=cmd_merge)
+
+    lp = subparsers.add_parser("list-presets", help="List available --preset names")
+    lp.set_defaults(func=cmd_list_presets)
+
+    lr = subparsers.add_parser("list-regions", help="List offline-baked region names")
+    lr.set_defaults(func=cmd_list_regions)
 
     args = parser.parse_args(argv)
 
