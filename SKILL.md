@@ -1,6 +1,6 @@
 ---
 name: rs-metadata-crawler
-description: 'Crawl satellite imagery metadata from Copernicus, USGS EarthExplorer, description: 'Crawl satellite imagery metadata from Copernicus, USGS EarthExplorer, and Microsoft Planetary Computer.  Search by bbox, date range, cloud cover, and platform. Output CSV/JSON with statistics and deduplication.  从 Copernicus、USGS EarthExplorer 和 Microsoft Planetary Computer 爬取卫星影像元数据。  支持按边界框、日期范围、云量和卫星平台搜索，输出 CSV/JSON 格式，含统计摘要和去重功能。  '
+description: 'Crawl satellite imagery metadata from Copernicus, USGS EarthExplorer, and Microsoft Planetary Computer.  Search by bbox, date range, cloud cover, and platform. Output CSV/JSON with statistics and deduplication.  从 Copernicus、USGS EarthExplorer 和 Microsoft Planetary Computer 爬取卫星影像元数据。  支持按边界框、日期范围、云量和卫星平台搜索，输出 CSV/JSON 格式，含统计摘要和去重功能。  '
 ---
 
 # RS Metadata Crawler
